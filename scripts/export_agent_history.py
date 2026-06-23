@@ -372,6 +372,60 @@ def scan_sensitive(dest: Path) -> int:
     return matches
 
 
+def collect_session_files(source: Path) -> list[Path]:
+    return sorted([p for p in source.rglob("*") if p.is_file() and p.suffix.lower() in {".json", ".jsonl"}])
+
+
+def run_dry_run(args: argparse.Namespace) -> int:
+    source = Path(args.source).expanduser().resolve()
+    dest = Path(args.dest).expanduser().resolve()
+    session_files = collect_session_files(source)
+    allowed_periods = set(args.period or []) or None
+    allowed_months = set(args.month or []) or None
+    matched_groups: dict[str, int] = {}
+    failed_files: list[dict[str, str]] = []
+
+    for path in session_files:
+        try:
+            records = list(iter_json_records(path))
+            date = date_from_record_or_path(path, records)
+            month = date[:7]
+            group_key = group_key_from_date(date, args.group_by)
+            if allowed_months and month not in allowed_months:
+                continue
+            if not period_matches(date, args.group_by, group_key, allowed_periods):
+                continue
+            matched_groups[group_key] = matched_groups.get(group_key, 0) + 1
+        except Exception as error:
+            failed_files.append(
+                {
+                    "file": path.name,
+                    "stage": "dry-run",
+                    "errorType": type(error).__name__,
+                    "message": str(error),
+                }
+            )
+
+    existing_output = dest.exists() and any(dest.iterdir())
+    print(f"source={source}")
+    print(f"destination={dest}")
+    print(f"groupBy={args.group_by}")
+    print(f"sourceFiles={len(session_files)}")
+    print(f"matchedFiles={sum(matched_groups.values())}")
+    print(f"matchedGroups={len(matched_groups)}")
+    print(f"destinationExists={dest.exists()}")
+    print(f"destinationHasExistingFiles={existing_output}")
+    if allowed_months:
+        print(f"monthFilter={','.join(sorted(allowed_months))}")
+    if allowed_periods:
+        print(f"periodFilter={','.join(sorted(allowed_periods))}")
+    for group, count in sorted(matched_groups.items()):
+        print(f"group={group}\tfiles={count}")
+    if failed_files:
+        print("failedFiles=" + json.dumps(failed_files, ensure_ascii=False))
+    return 1 if failed_files else 0
+
+
 def run_export(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser().resolve()
     dest = Path(args.dest).expanduser().resolve()
@@ -382,7 +436,7 @@ def run_export(args: argparse.Namespace) -> int:
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         group_by=args.group_by,
     )
-    session_files = sorted([p for p in source.rglob("*") if p.is_file() and p.suffix.lower() in {".json", ".jsonl"}])
+    session_files = collect_session_files(source)
     stats.total_session_files = len(session_files)
     allowed_periods = set(args.period or []) or None
     allowed_months = set(args.month or []) or None
@@ -432,6 +486,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--month", action="append", help="Limit source sessions to YYYY-MM before grouping. Can be repeated.")
     parser.add_argument("--period", action="append", help="Limit exported groups after applying --group-by. hierarchy accepts year, month, week, day, or full relative path.")
     parser.add_argument("--tag-rules", help="Optional JSON file mapping tag names to regex patterns. Defaults to references/tag-rules.json beside this skill.")
+    parser.add_argument("--dry-run", action="store_true", help="Preview source file count, matched groups, filters, and destination state without writing files.")
     parser.add_argument("--check-only", action="store_true", help="Only scan destination for sensitive patterns.")
     return parser.parse_args()
 
@@ -440,6 +495,10 @@ def main() -> int:
     args = parse_args()
     if args.check_only:
         return run_check(args)
+    if args.dry_run:
+        if not args.source:
+            raise SystemExit("--source is required when --dry-run is used")
+        return run_dry_run(args)
     if not args.source:
         raise SystemExit("--source is required unless --check-only is used")
     return run_export(args)

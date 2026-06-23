@@ -9,6 +9,7 @@ Use a synthetic fixture before running on real history. The fixture should inclu
 
 Expected checks:
 
+- `--dry-run` reports sourceFiles, matchedFiles, matchedGroups, destinationExists, and destinationHasExistingFiles without creating output files.
 - Exported Markdown contains only `## user` and `## assistant` sections.
 - `manifest.md` and `export-stats.json` exist.
 - `summary.tsv` exists in hierarchy leaf directories.

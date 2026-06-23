@@ -26,12 +26,13 @@ Do not write machine-specific absolute paths into skill docs or generated guidan
 1. Choose source and destination.
    - Source is usually `<CODEX_HOME>/sessions`.
    - Destination is usually `<AGENTS_HOME>/data/exporting-agent-history/raw-history`.
-2. Run `scripts/export_agent_history.py`.
-3. Confirm `export-stats.json`, `manifest.md`, and hierarchy folders exist.
-4. Use the default hierarchy grouping unless the user explicitly asks for a single-level export.
-5. Run the script again with `--check-only` against the export destination.
-6. Use the generated group summary for the period being reviewed.
-7. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
+2. Run `scripts/export_agent_history.py --dry-run` to preview source file count, filters, groups, and destination state.
+3. Run `scripts/export_agent_history.py`.
+4. Confirm `export-stats.json`, `manifest.md`, and hierarchy folders exist.
+5. Use the default hierarchy grouping unless the user explicitly asks for a single-level export.
+6. Run the script again with `--check-only` against the export destination.
+7. Use the generated group summary for the period being reviewed.
+8. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
 
 Default summary tags come from `references/tag-rules.json`. Use `--tag-rules` only when a specific review needs a temporary tag set.
 
@@ -49,6 +50,15 @@ Typical export:
 python scripts/export_agent_history.py \
   --source "<CODEX_HOME>/sessions" \
   --dest "<AGENTS_HOME>/data/exporting-agent-history/raw-history"
+```
+
+Preview without writing files:
+
+```bash
+python scripts/export_agent_history.py \
+  --source "<CODEX_HOME>/sessions" \
+  --dest "<AGENTS_HOME>/data/exporting-agent-history/raw-history" \
+  --dry-run
 ```
 
 Default output is hierarchical:
@@ -151,6 +161,7 @@ Markdown sessions must include only user and assistant messages. System, develop
 
 ## Data Rules
 
+- Prefer `--dry-run` before exporting into a non-empty destination.
 - Redact before writing exported Markdown.
 - Redact common API keys, bearer tokens, JWT-like strings, cloud access keys, emails, phone numbers, private IPs, and obvious credential assignments.
 - Count redactions in `export-stats.json`.
