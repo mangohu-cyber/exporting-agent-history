@@ -26,6 +26,11 @@ def copy_fixtures(skill_root: Path, source: Path) -> None:
     shutil.copy2(fixtures / "sample-2026-02.json", source / "sample-2026-02.json")
 
 
+def copy_claude_fixtures(skill_root: Path, source: Path) -> None:
+    fixtures = skill_root / "references" / "test-fixtures"
+    shutil.copy2(fixtures / "sample-claude-2026-03.jsonl", source / "sample-claude-2026-03.jsonl")
+
+
 def read_stats(dest: Path) -> dict:
     return json.loads((dest / "export-stats.json").read_text(encoding="utf-8"))
 
@@ -67,6 +72,42 @@ def validate_export_flow(skill_root: Path, script: Path) -> None:
         summaries = "\n".join(path.read_text(encoding="utf-8") for path in dest.rglob("summary.tsv"))
         assert_contains(summaries, "debug,build-verify")
         assert_contains(summaries, "state-cache,map-ui,workflow-skill")
+
+
+def validate_claude_export_flow(skill_root: Path, script: Path) -> None:
+    with tempfile.TemporaryDirectory(prefix="agent-history-claude-") as temp:
+        root = Path(temp)
+        source = root / "source"
+        dest = root / "out"
+        source.mkdir()
+        copy_claude_fixtures(skill_root, source)
+
+        dry_run = run_command([sys.executable, str(script), "--source", str(source), "--dest", str(dest), "--source-format", "claude", "--dry-run"])
+        assert_contains(dry_run.stdout, "sourceFormat=claude")
+        assert_contains(dry_run.stdout, "matchedFiles=1")
+
+        export = run_command([sys.executable, str(script), "--source", str(source), "--dest", str(dest), "--source-format", "claude"])
+        assert_contains(export.stdout, "exportedFiles=1")
+        assert_contains(export.stdout, "messages=2")
+        assert_contains(export.stdout, "redactions=1")
+        assert_contains(export.stdout, "sensitivePatternMatches=0")
+
+        stats = read_stats(dest)
+        if stats["options"]["sourceFormat"] != "claude":
+            raise AssertionError("Expected sourceFormat=claude in export options")
+        if stats["totalMessages"] != 2:
+            raise AssertionError("Expected Claude export totalMessages=2")
+        if stats["userMessages"] != 1:
+            raise AssertionError("Expected Claude export userMessages=1")
+        if stats["assistantMessages"] != 1:
+            raise AssertionError("Expected Claude export assistantMessages=1")
+
+        exported = "\n".join(path.read_text(encoding="utf-8") for path in dest.rglob("*.md"))
+        assert_contains(exported, "[REDACTED:credential_assignment]")
+        assert_contains(exported, "The failure points to the Release build path.")
+        for unexpected in ("tool_use", "tool_result", "This summary must not be exported", "Tool result must not be exported"):
+            if unexpected in exported:
+                raise AssertionError(f"Claude export included non-dialog content: {unexpected}")
 
 
 def validate_destination_safety(skill_root: Path, script: Path) -> None:
@@ -114,6 +155,7 @@ def validate_failure_shape(script: Path) -> None:
 def main() -> int:
     skill_root = Path(__file__).resolve().parent.parent
     script = skill_root / "scripts" / "export_agent_history.py"
+    validate_claude_export_flow(skill_root, script)
     validate_export_flow(skill_root, script)
     validate_destination_safety(skill_root, script)
     validate_failure_shape(script)

@@ -14,6 +14,7 @@ from typing import Any, Iterable
 
 
 ROLE_ALLOWLIST = {"user", "assistant"}
+SOURCE_FORMATS = ("codex", "claude")
 
 
 REDACTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -173,7 +174,7 @@ def role_from_payload(item: dict[str, Any]) -> str | None:
     return None
 
 
-def extract_message(record: dict[str, Any]) -> tuple[str, str] | None:
+def extract_codex_message(record: dict[str, Any]) -> tuple[str, str] | None:
     item = normalize_record(record)
     role = role_from_payload(item)
     if not role:
@@ -182,6 +183,44 @@ def extract_message(record: dict[str, Any]) -> tuple[str, str] | None:
     if not text.strip():
         return None
     return role, text.strip()
+
+
+def extract_claude_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, list):
+        return ""
+    parts: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            parts.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "text":
+            parts.append(extract_text(item.get("text")))
+    return "\n".join(part for part in parts if part)
+
+
+def extract_claude_message(record: dict[str, Any]) -> tuple[str, str] | None:
+    if record.get("type") not in ROLE_ALLOWLIST:
+        return None
+    message = record.get("message")
+    if not isinstance(message, dict):
+        return None
+    role = message.get("role")
+    if role not in ROLE_ALLOWLIST:
+        return None
+    text = extract_claude_text(message.get("content"))
+    if not text.strip():
+        return None
+    return str(role), text.strip()
+
+
+def extract_message(record: dict[str, Any], source_format: str) -> tuple[str, str] | None:
+    if source_format == "claude":
+        return extract_claude_message(record)
+    return extract_codex_message(record)
 
 
 def date_from_record_or_path(path: Path, records: list[dict[str, Any]]) -> str:
@@ -245,7 +284,7 @@ def markdown_name(path: Path, date: str) -> str:
     return f"{safe_stem}.md"
 
 
-def export_one(path: Path, dest: Path, stats: ExportStats, allowed_periods: set[str] | None, allowed_months: set[str] | None) -> None:
+def export_one(path: Path, dest: Path, stats: ExportStats, allowed_periods: set[str] | None, allowed_months: set[str] | None, source_format: str) -> None:
     records = list(iter_json_records(path))
     date = date_from_record_or_path(path, records)
     month = date[:7]
@@ -258,7 +297,7 @@ def export_one(path: Path, dest: Path, stats: ExportStats, allowed_periods: set[
     messages: list[tuple[str, str]] = []
     redactions = 0
     for record in records:
-        message = extract_message(record)
+        message = extract_message(record, source_format)
         if not message:
             continue
         role, text = message
@@ -395,6 +434,7 @@ def clean_destination(dest: Path) -> None:
 
 def export_options(args: argparse.Namespace, tag_rules_path: Path) -> dict[str, Any]:
     return {
+        "sourceFormat": args.source_format,
         "groupBy": args.group_by,
         "months": list(args.month or []),
         "periods": list(args.period or []),
@@ -436,6 +476,7 @@ def run_dry_run(args: argparse.Namespace) -> int:
     existing_output = destination_has_files(dest)
     print(f"source={source}")
     print(f"destination={dest}")
+    print(f"sourceFormat={args.source_format}")
     print(f"groupBy={args.group_by}")
     print(f"sourceFiles={len(session_files)}")
     print(f"matchedFiles={sum(matched_groups.values())}")
@@ -476,7 +517,7 @@ def run_export(args: argparse.Namespace) -> int:
     tag_patterns = load_tag_patterns(tag_rules_path)
     for path in session_files:
         try:
-            export_one(path, dest, stats, allowed_periods, allowed_months)
+            export_one(path, dest, stats, allowed_periods, allowed_months, args.source_format)
         except Exception as error:
             stats.failed_files.append(
                 {
@@ -514,6 +555,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export and sanitize local agent conversation history.")
     parser.add_argument("--source", help="Source session directory. Required unless --check-only is used.")
     parser.add_argument("--dest", required=True, help="Export destination directory.")
+    parser.add_argument("--source-format", choices=SOURCE_FORMATS, default="codex", help="Input history format. Use codex for Codex sessions and claude for Claude Code project JSONL.")
     parser.add_argument("--group-by", choices=("hierarchy", "year", "month", "week", "day"), default="hierarchy", help="Directory grouping rule. hierarchy creates YYYY/YYYY-MM/YYYY-Www/YYYY-MM-DD. week uses ISO week, e.g. 2026-W03.")
     parser.add_argument("--month", action="append", help="Limit source sessions to YYYY-MM before grouping. Can be repeated.")
     parser.add_argument("--period", action="append", help="Limit exported groups after applying --group-by. hierarchy accepts year, month, week, day, or full relative path.")

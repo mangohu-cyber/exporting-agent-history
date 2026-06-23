@@ -16,6 +16,7 @@ Before running exports, state the source, destination, grouping rule, and time s
 Use placeholders in documentation and examples:
 
 - `<CODEX_HOME>` for the Codex data root.
+- `<CLAUDE_HOME>` for the Claude Code data root.
 - `<AGENTS_HOME>` for the agent data root.
 - `<EXPORT_ROOT>` for the chosen export destination.
 
@@ -24,15 +25,17 @@ Do not write machine-specific absolute paths into skill docs or generated guidan
 ## Standard Workflow
 
 1. Choose source and destination.
-   - Source is usually `<CODEX_HOME>/sessions`.
+   - Codex source is usually `<CODEX_HOME>/sessions`.
+   - Claude Code source is usually `<CLAUDE_HOME>/projects`.
    - Destination is usually `<AGENTS_HOME>/data/exporting-agent-history/raw-history`.
-2. Run `scripts/export_agent_history.py --dry-run` to preview source file count, filters, groups, and destination state.
-3. Run `scripts/export_agent_history.py`. If the destination is non-empty and the user wants replacement, pass `--clean-dest`.
-4. Confirm `export-stats.json`, `manifest.md`, and hierarchy folders exist.
-5. Use the default hierarchy grouping unless the user explicitly asks for a single-level export.
-6. Run the script again with `--check-only` against the export destination.
-7. Use the generated group summary for the period being reviewed.
-8. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
+2. Choose `--source-format codex` or `--source-format claude`; omit it only for Codex because `codex` is the default.
+3. Run `scripts/export_agent_history.py --dry-run` to preview source file count, filters, groups, and destination state.
+4. Run `scripts/export_agent_history.py`. If the destination is non-empty and the user wants replacement, pass `--clean-dest`.
+5. Confirm `export-stats.json`, `manifest.md`, and hierarchy folders exist.
+6. Use the default hierarchy grouping unless the user explicitly asks for a single-level export.
+7. Run the script again with `--check-only` against the export destination.
+8. Use the generated group summary for the period being reviewed.
+9. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
 
 Default summary tags come from `references/tag-rules.json`. Use `--tag-rules` only when a specific review needs a temporary tag set.
 
@@ -56,6 +59,15 @@ Typical export:
 python scripts/export_agent_history.py \
   --source "<CODEX_HOME>/sessions" \
   --dest "<AGENTS_HOME>/data/exporting-agent-history/raw-history"
+```
+
+Export Claude Code history:
+
+```bash
+python scripts/export_agent_history.py \
+  --source "<CLAUDE_HOME>/projects" \
+  --dest "<AGENTS_HOME>/data/exporting-agent-history/claude-history" \
+  --source-format claude
 ```
 
 Replace an existing export only after dry-run confirms the scope:
@@ -172,6 +184,8 @@ Single-level exports write `GROUP/rollout-*.md` and `GROUP-summary.tsv`.
 
 Markdown sessions must include only user and assistant messages. System, developer, tool, and event records are not review material.
 
+Claude Code exports must include only `user` and `assistant` message text. Skip summaries, `tool_use`, `tool_result`, and non-text content blocks.
+
 `summary.tsv` tags should remain broad review cues, not final conclusions. The default tag set covers debug, requirements, state/cache, map/UI, build/verify, workflow/skill, multi-end requirements, and document/PDF work.
 
 ## Data Rules
@@ -179,6 +193,7 @@ Markdown sessions must include only user and assistant messages. System, develop
 - Prefer `--dry-run` before exporting into a non-empty destination.
 - Do not write into a non-empty destination unless the user explicitly chose replacement with `--clean-dest`.
 - `export-stats.json` records export options including grouping, month filters, period filters, tag rules, and whether `--clean-dest` was used.
+- `export-stats.json` records `sourceFormat` so Codex and Claude exports remain distinguishable.
 - Redact before writing exported Markdown.
 - Redact common API keys, bearer tokens, JWT-like strings, cloud access keys, emails, phone numbers, private IPs, and obvious credential assignments.
 - Count redactions in `export-stats.json`.

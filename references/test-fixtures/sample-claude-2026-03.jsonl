@@ -1,0 +1,4 @@
+{"type":"user","timestamp":"2026-03-05T10:00:00Z","message":{"role":"user","content":"Please inspect the build failure. password=secret123"}}
+{"type":"assistant","timestamp":"2026-03-05T10:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"The failure points to the Release build path."},{"type":"tool_use","id":"toolu_01","name":"Read","input":{"file_path":"secret.txt"}}]}}
+{"type":"summary","timestamp":"2026-03-05T10:00:02Z","summary":"This summary must not be exported."}
+{"type":"user","timestamp":"2026-03-05T10:00:03Z","message":{"role":"user","content":[{"type":"tool_result","content":"Tool result must not be exported."}]}}
