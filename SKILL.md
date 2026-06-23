@@ -27,7 +27,7 @@ Do not write machine-specific absolute paths into skill docs or generated guidan
    - Source is usually `<CODEX_HOME>/sessions`.
    - Destination is usually `<AGENTS_HOME>/data/exporting-agent-history/raw-history`.
 2. Run `scripts/export_agent_history.py --dry-run` to preview source file count, filters, groups, and destination state.
-3. Run `scripts/export_agent_history.py`.
+3. Run `scripts/export_agent_history.py`. If the destination is non-empty and the user wants replacement, pass `--clean-dest`.
 4. Confirm `export-stats.json`, `manifest.md`, and hierarchy folders exist.
 5. Use the default hierarchy grouping unless the user explicitly asks for a single-level export.
 6. Run the script again with `--check-only` against the export destination.
@@ -44,12 +44,27 @@ Run help before first use:
 python scripts/export_agent_history.py --help
 ```
 
+Run the bundled validation after changing this skill or script:
+
+```bash
+python scripts/validate_export_agent_history.py
+```
+
 Typical export:
 
 ```bash
 python scripts/export_agent_history.py \
   --source "<CODEX_HOME>/sessions" \
   --dest "<AGENTS_HOME>/data/exporting-agent-history/raw-history"
+```
+
+Replace an existing export only after dry-run confirms the scope:
+
+```bash
+python scripts/export_agent_history.py \
+  --source "<CODEX_HOME>/sessions" \
+  --dest "<AGENTS_HOME>/data/exporting-agent-history/raw-history" \
+  --clean-dest
 ```
 
 Preview without writing files:
@@ -162,6 +177,8 @@ Markdown sessions must include only user and assistant messages. System, develop
 ## Data Rules
 
 - Prefer `--dry-run` before exporting into a non-empty destination.
+- Do not write into a non-empty destination unless the user explicitly chose replacement with `--clean-dest`.
+- `export-stats.json` records export options including grouping, month filters, period filters, tag rules, and whether `--clean-dest` was used.
 - Redact before writing exported Markdown.
 - Redact common API keys, bearer tokens, JWT-like strings, cloud access keys, emails, phone numbers, private IPs, and obvious credential assignments.
 - Count redactions in `export-stats.json`.

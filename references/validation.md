@@ -9,7 +9,11 @@ Use a synthetic fixture before running on real history. The fixture should inclu
 
 Expected checks:
 
+- `scripts/validate_export_agent_history.py` passes.
 - `--dry-run` reports sourceFiles, matchedFiles, matchedGroups, destinationExists, and destinationHasExistingFiles without creating output files.
+- Export refuses to write into a non-empty destination unless `--clean-dest` is passed.
+- `--clean-dest` replaces the destination contents before export.
+- `export-stats.json` includes an `options` object with groupBy, months, periods, tagRules, and cleanDest.
 - Exported Markdown contains only `## user` and `## assistant` sections.
 - `manifest.md` and `export-stats.json` exist.
 - `summary.tsv` exists in hierarchy leaf directories.

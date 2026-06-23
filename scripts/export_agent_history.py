@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -61,6 +62,7 @@ class ExportStats:
     destination: str
     generated_at: str
     group_by: str
+    options: dict[str, Any] = field(default_factory=dict)
     total_session_files: int = 0
     exported_markdown_files: int = 0
     failed_files: list[dict[str, str]] = field(default_factory=list)
@@ -299,6 +301,7 @@ def stats_to_json(stats: ExportStats) -> dict[str, Any]:
         "destination": stats.destination,
         "generatedAt": stats.generated_at,
         "groupBy": stats.group_by,
+        "options": stats.options,
         "totalSessionFiles": stats.total_session_files,
         "exportedMarkdownFiles": stats.exported_markdown_files,
         "failedFiles": stats.failed_files,
@@ -376,6 +379,30 @@ def collect_session_files(source: Path) -> list[Path]:
     return sorted([p for p in source.rglob("*") if p.is_file() and p.suffix.lower() in {".json", ".jsonl"}])
 
 
+def destination_has_files(dest: Path) -> bool:
+    return dest.exists() and any(dest.iterdir())
+
+
+def clean_destination(dest: Path) -> None:
+    if not dest.exists():
+        return
+    for child in dest.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
+def export_options(args: argparse.Namespace, tag_rules_path: Path) -> dict[str, Any]:
+    return {
+        "groupBy": args.group_by,
+        "months": list(args.month or []),
+        "periods": list(args.period or []),
+        "tagRules": str(tag_rules_path),
+        "cleanDest": bool(args.clean_dest),
+    }
+
+
 def run_dry_run(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser().resolve()
     dest = Path(args.dest).expanduser().resolve()
@@ -406,7 +433,7 @@ def run_dry_run(args: argparse.Namespace) -> int:
                 }
             )
 
-    existing_output = dest.exists() and any(dest.iterdir())
+    existing_output = destination_has_files(dest)
     print(f"source={source}")
     print(f"destination={dest}")
     print(f"groupBy={args.group_by}")
@@ -429,18 +456,23 @@ def run_dry_run(args: argparse.Namespace) -> int:
 def run_export(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser().resolve()
     dest = Path(args.dest).expanduser().resolve()
+    if destination_has_files(dest):
+        if not args.clean_dest:
+            raise SystemExit("--dest is not empty. Use --dry-run first, then pass --clean-dest to replace it.")
+        clean_destination(dest)
     dest.mkdir(parents=True, exist_ok=True)
+    tag_rules_path = Path(args.tag_rules).expanduser().resolve() if args.tag_rules else default_tag_rules_path()
     stats = ExportStats(
         source=args.source,
         destination=args.dest,
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         group_by=args.group_by,
+        options=export_options(args, tag_rules_path),
     )
     session_files = collect_session_files(source)
     stats.total_session_files = len(session_files)
     allowed_periods = set(args.period or []) or None
     allowed_months = set(args.month or []) or None
-    tag_rules_path = Path(args.tag_rules).expanduser().resolve() if args.tag_rules else default_tag_rules_path()
     tag_patterns = load_tag_patterns(tag_rules_path)
     for path in session_files:
         try:
@@ -486,6 +518,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--month", action="append", help="Limit source sessions to YYYY-MM before grouping. Can be repeated.")
     parser.add_argument("--period", action="append", help="Limit exported groups after applying --group-by. hierarchy accepts year, month, week, day, or full relative path.")
     parser.add_argument("--tag-rules", help="Optional JSON file mapping tag names to regex patterns. Defaults to references/tag-rules.json beside this skill.")
+    parser.add_argument("--clean-dest", action="store_true", help="Clean a non-empty destination before export. Without this flag, export refuses to write into a non-empty destination.")
     parser.add_argument("--dry-run", action="store_true", help="Preview source file count, matched groups, filters, and destination state without writing files.")
     parser.add_argument("--check-only", action="store_true", help="Only scan destination for sensitive patterns.")
     return parser.parse_args()
