@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export local agent conversation history into sanitized monthly review inputs."""
+"""Export local agent conversation history into sanitized review inputs."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ COMMON_PREFIX_PATTERNS = [
 
 
 @dataclass
-class MonthStats:
+class GroupStats:
     files: int = 0
     messages: int = 0
     user: int = 0
@@ -59,7 +59,7 @@ class ExportStats:
     user_messages: int = 0
     assistant_messages: int = 0
     redactions: int = 0
-    groups: dict[str, MonthStats] = field(default_factory=dict)
+    groups: dict[str, GroupStats] = field(default_factory=dict)
 
 
 def redact_text(text: str) -> tuple[str, int]:
@@ -171,14 +171,43 @@ def date_from_record_or_path(path: Path, records: list[dict[str, Any]]) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d")
 
 
-def group_key_from_date(date_text: str, group_by: str) -> str:
+def date_group_parts(date_text: str) -> dict[str, str]:
     parsed = datetime.strptime(date_text, "%Y-%m-%d").date()
-    if group_by == "day":
-        return date_text
+    iso = parsed.isocalendar()
+    return {
+        "year": date_text[:4],
+        "month": date_text[:7],
+        "week": f"{iso.year}-W{iso.week:02d}",
+        "day": date_text,
+    }
+
+
+def group_key_from_date(date_text: str, group_by: str) -> str:
+    parts = date_group_parts(date_text)
+    if group_by == "hierarchy":
+        return "/".join([parts["year"], parts["month"], parts["week"], parts["day"]])
+    if group_by == "year":
+        return parts["year"]
     if group_by == "week":
-        iso = parsed.isocalendar()
-        return f"{iso.year}-W{iso.week:02d}"
-    return date_text[:7]
+        return parts["week"]
+    if group_by == "day":
+        return parts["day"]
+    return parts["month"]
+
+
+def group_dir_from_key(dest: Path, group_key: str) -> Path:
+    return dest.joinpath(*group_key.split("/"))
+
+
+def period_matches(date_text: str, group_by: str, group_key: str, allowed_periods: set[str] | None) -> bool:
+    if not allowed_periods:
+        return True
+    if group_by != "hierarchy":
+        return group_key in allowed_periods
+    parts = date_group_parts(date_text)
+    candidates = set(parts.values())
+    candidates.add(group_key)
+    return bool(candidates & allowed_periods)
 
 
 def markdown_name(path: Path, date: str) -> str:
@@ -196,7 +225,7 @@ def export_one(path: Path, dest: Path, stats: ExportStats, allowed_periods: set[
     group_key = group_key_from_date(date, stats.group_by)
     if allowed_months and month not in allowed_months:
         return
-    if allowed_periods and group_key not in allowed_periods:
+    if not period_matches(date, stats.group_by, group_key, allowed_periods):
         return
 
     messages: list[tuple[str, str]] = []
@@ -213,7 +242,7 @@ def export_one(path: Path, dest: Path, stats: ExportStats, allowed_periods: set[
     if not messages:
         return
 
-    group_dir = dest / group_key
+    group_dir = group_dir_from_key(dest, group_key)
     group_dir.mkdir(parents=True, exist_ok=True)
     output_path = group_dir / markdown_name(path, date)
 
@@ -225,7 +254,7 @@ def export_one(path: Path, dest: Path, stats: ExportStats, allowed_periods: set[
     user_count = sum(1 for role, _ in messages if role == "user")
     assistant_count = sum(1 for role, _ in messages if role == "assistant")
 
-    group_stats = stats.groups.setdefault(group_key, MonthStats())
+    group_stats = stats.groups.setdefault(group_key, GroupStats())
     group_stats.files += 1
     group_stats.messages += len(messages)
     group_stats.user += user_count
@@ -279,8 +308,8 @@ def write_manifest(dest: Path, stats: ExportStats) -> None:
 
 
 def write_group_summary(dest: Path, group: str) -> Path:
-    group_dir = dest / group
-    output_path = dest / f"{group}-summary.tsv"
+    group_dir = group_dir_from_key(dest, group)
+    output_path = group_dir / "summary.tsv" if "/" in group else dest / f"{group}-summary.tsv"
     rows = ["file\tdate\tuserTurns\tassistantTurns\tbytes\ttags"]
     if not group_dir.exists():
         output_path.write_text("\r\n".join(rows) + "\r\n", encoding="utf-8")
@@ -372,9 +401,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export and sanitize local agent conversation history.")
     parser.add_argument("--source", help="Source session directory. Required unless --check-only is used.")
     parser.add_argument("--dest", required=True, help="Export destination directory.")
-    parser.add_argument("--group-by", choices=("month", "week", "day"), default="month", help="Directory grouping rule. week uses ISO week, e.g. 2026-W03.")
+    parser.add_argument("--group-by", choices=("hierarchy", "year", "month", "week", "day"), default="hierarchy", help="Directory grouping rule. hierarchy creates YYYY/YYYY-MM/YYYY-Www/YYYY-MM-DD. week uses ISO week, e.g. 2026-W03.")
     parser.add_argument("--month", action="append", help="Limit source sessions to YYYY-MM before grouping. Can be repeated.")
-    parser.add_argument("--period", action="append", help="Limit exported groups after applying --group-by. Examples: 2026-03, 2026-W12, 2026-03-24.")
+    parser.add_argument("--period", action="append", help="Limit exported groups after applying --group-by. hierarchy accepts year, month, week, day, or full relative path.")
     parser.add_argument("--check-only", action="store_true", help="Only scan destination for sensitive patterns.")
     return parser.parse_args()
 

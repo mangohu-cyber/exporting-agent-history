@@ -1,6 +1,6 @@
 ---
 name: exporting-agent-history
-description: Use when local agent or Codex conversation history must be exported, sanitized, grouped by month, summarized, or prepared as safe input for development retrospectives.
+description: Use when local agent or Codex conversation history must be exported, sanitized, organized by year/month/week/day, summarized, or prepared as safe input for development retrospectives.
 ---
 
 # Exporting Agent History
@@ -25,10 +25,10 @@ Do not write machine-specific absolute paths into skill docs or generated guidan
 
 1. Choose source and destination.
    - Source is usually `<CODEX_HOME>/sessions`.
-   - Destination is usually `<AGENTS_HOME>/development-learning/raw-history`.
+   - Destination is usually `<AGENTS_HOME>/data/exporting-agent-history/raw-history`.
 2. Run `scripts/export_agent_history.py`.
-3. Confirm `export-stats.json`, `manifest.md`, and month folders exist.
-4. Choose `--group-by month`, `--group-by week`, or `--group-by day`. Default is `month`.
+3. Confirm `export-stats.json`, `manifest.md`, and hierarchy folders exist.
+4. Use the default hierarchy grouping unless the user explicitly asks for a single-level export.
 5. Run the script again with `--check-only` against the export destination.
 6. Use the generated group summary for the period being reviewed.
 7. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
@@ -46,26 +46,31 @@ Typical export:
 ```bash
 python scripts/export_agent_history.py \
   --source "<CODEX_HOME>/sessions" \
-  --dest "<AGENTS_HOME>/development-learning/raw-history"
+  --dest "<AGENTS_HOME>/data/exporting-agent-history/raw-history"
 ```
 
-Group by ISO week:
+Default output is hierarchical:
+
+```text
+<EXPORT_ROOT>/
+  YYYY/
+    YYYY-MM/
+      YYYY-Www/
+        YYYY-MM-DD/
+          rollout-*.md
+          summary.tsv
+```
+
+Single-level export, when explicitly needed:
 
 ```bash
 python scripts/export_agent_history.py \
   --source "<CODEX_HOME>/sessions" \
   --dest "<EXPORT_ROOT>" \
-  --group-by week
+  --group-by month
 ```
 
-Group by day:
-
-```bash
-python scripts/export_agent_history.py \
-  --source "<CODEX_HOME>/sessions" \
-  --dest "<EXPORT_ROOT>" \
-  --group-by day
-```
+Other single-level choices are `year`, `week`, and `day`. Week uses ISO week, Monday start.
 
 Limit source sessions to months before grouping:
 
@@ -76,7 +81,18 @@ python scripts/export_agent_history.py \
   --month 2026-03 --month 2026-04
 ```
 
-Limit exported groups after applying `--group-by`:
+Limit exported hierarchy periods after grouping:
+
+```bash
+python scripts/export_agent_history.py \
+  --source "<CODEX_HOME>/sessions" \
+  --dest "<EXPORT_ROOT>" \
+  --period 2026-03
+```
+
+Hierarchy `--period` accepts a year, month, ISO week, day, or full relative path.
+
+Single-level period filtering:
 
 ```bash
 python scripts/export_agent_history.py \
@@ -100,16 +116,23 @@ The export directory must contain:
 <EXPORT_ROOT>/
   manifest.md
   export-stats.json
-  GROUP/
-    rollout-*.md
-  GROUP-summary.tsv
+  YYYY/
+    YYYY-MM/
+      YYYY-Www/
+        YYYY-MM-DD/
+          rollout-*.md
+          summary.tsv
 ```
 
 Group names:
 
+- `hierarchy`: `YYYY/YYYY-MM/YYYY-Www/YYYY-MM-DD`
+- `year`: `YYYY`
 - `month`: `YYYY-MM`
 - `week`: `YYYY-Www` using ISO week, Monday start
 - `day`: `YYYY-MM-DD`
+
+Single-level exports write `GROUP/rollout-*.md` and `GROUP-summary.tsv`.
 
 Markdown sessions must include only user and assistant messages. System, developer, tool, and event records are not review material.
 
@@ -129,7 +152,7 @@ When handing data to `development-learning`, provide:
 - Message counts by role.
 - Redaction counts.
 - Sensitive scan result.
-- Paths to manifest, stats, and monthly summary.
+- Paths to manifest, stats, and relevant period summaries.
 
 Do not provide raw snippets unless the user explicitly asks and the content is confirmed non-sensitive.
 
