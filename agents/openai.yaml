@@ -1,0 +1,3 @@
+display_name: Exporting Agent History
+short_description: Export sanitized agent histories.
+default_prompt: Export local agent history into sanitized monthly review inputs.

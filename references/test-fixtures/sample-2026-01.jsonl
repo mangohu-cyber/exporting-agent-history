@@ -1,0 +1,4 @@
+{"timestamp":"2026-01-02T10:00:00Z","item":{"role":"system","content":"Do not export this system message."}}
+{"timestamp":"2026-01-02T10:01:00Z","item":{"role":"user","content":"Please debug this. token=sk-abcdefghijklmnopqrstuvwxyz123456"}}
+{"timestamp":"2026-01-02T10:02:00Z","item":{"role":"assistant","content":"I will inspect the sanitized input and report counts only."}}
+{"timestamp":"2026-01-02T10:03:00Z","item":{"role":"developer","content":"Do not export this developer message."}}

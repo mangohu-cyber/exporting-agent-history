@@ -1,0 +1,17 @@
+[
+  {
+    "timestamp": "2026-02-03T09:00:00Z",
+    "role": "user",
+    "content": "Summarize this exported month."
+  },
+  {
+    "timestamp": "2026-02-03T09:01:00Z",
+    "role": "assistant",
+    "content": "Summary should be generated without raw sensitive lines."
+  },
+  {
+    "timestamp": "2026-02-03T09:02:00Z",
+    "role": "tool",
+    "content": "Do not export tool output."
+  }
+]
