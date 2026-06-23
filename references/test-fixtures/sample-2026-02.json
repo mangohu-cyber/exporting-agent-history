@@ -2,7 +2,7 @@
   {
     "timestamp": "2026-02-03T09:00:00Z",
     "role": "user",
-    "content": "Summarize this exported month."
+    "content": "复盘这个月的地图 UI、状态缓存和 agent skill 工作流。"
   },
   {
     "timestamp": "2026-02-03T09:01:00Z",

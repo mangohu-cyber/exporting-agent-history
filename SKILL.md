@@ -33,6 +33,8 @@ Do not write machine-specific absolute paths into skill docs or generated guidan
 6. Use the generated group summary for the period being reviewed.
 7. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
 
+Default summary tags come from `references/tag-rules.json`. Use `--tag-rules` only when a specific review needs a temporary tag set.
+
 ## Script
 
 Run help before first use:
@@ -108,6 +110,15 @@ Validation only:
 python scripts/export_agent_history.py --dest "<EXPORT_ROOT>" --check-only
 ```
 
+Custom tag rules:
+
+```bash
+python scripts/export_agent_history.py \
+  --source "<CODEX_HOME>/sessions" \
+  --dest "<EXPORT_ROOT>" \
+  --tag-rules "<PATH_TO_TAG_RULES_JSON>"
+```
+
 ## Output Contract
 
 The export directory must contain:
@@ -135,6 +146,8 @@ Group names:
 Single-level exports write `GROUP/rollout-*.md` and `GROUP-summary.tsv`.
 
 Markdown sessions must include only user and assistant messages. System, developer, tool, and event records are not review material.
+
+`summary.tsv` tags should remain broad review cues, not final conclusions. The default tag set covers debug, requirements, state/cache, map/UI, build/verify, workflow/skill, multi-end requirements, and document/PDF work.
 
 ## Data Rules
 

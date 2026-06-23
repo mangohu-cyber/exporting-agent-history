@@ -19,3 +19,5 @@ Expected checks:
 - `--group-by month` creates groups such as `2026-01`.
 - `--group-by week` creates ISO week groups such as `2026-W01`.
 - `--group-by day` creates groups such as `2026-01-02`.
+- `summary.tsv` tags include configured categories from `references/tag-rules.json` when fixture content matches them.
+- `failedFiles` entries include file, stage, errorType, and message when a source file cannot be exported.

@@ -1,0 +1,10 @@
+{
+  "debug": "bug|error|failed|失败|错误|日志|排查|定位|修复|异常|崩溃|复现",
+  "requirements": "需求|方案|设计|架构|边界|规则|文档|说明|验收|非目标",
+  "state-cache": "状态|缓存|刷新|切换|恢复|断连|重连|离线|在线|生命周期|signal|slot",
+  "map-ui": "地图|楼层|点位|路径|导入|导出|UI|页面|组件|布局|交互|Tooltip|显示",
+  "build-verify": "build|cmake|ninja|msvc|编译|构建|验证|测试|Release|Debug",
+  "workflow-skill": "agent|skill|复盘|历史|导出|脱敏|manifest|Codex|workflow|工作流",
+  "multi-end-requirements": "云端|本地|机器人端|客户端|多端|设备档案|SN|版本|冲突|同步",
+  "document-pdf": "PDF|图解|截图|渲染|版式|字体|文档|说明书|可读性"
+}

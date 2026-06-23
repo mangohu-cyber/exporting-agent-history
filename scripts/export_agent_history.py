@@ -37,6 +37,15 @@ COMMON_PREFIX_PATTERNS = [
 ]
 
 
+DEFAULT_TAG_RULES = {
+    "debug": r"bug|error|failed|失败|错误|日志|排查|定位|修复|异常",
+    "requirements": r"需求|方案|设计|架构|边界|规则|文档|说明",
+    "state-cache": r"状态|缓存|刷新|切换|恢复|断连|重连|signal|slot",
+    "build-verify": r"build|cmake|ninja|msvc|编译|构建|验证|测试",
+    "workflow-skill": r"agent|skill|复盘|历史|导出|脱敏|manifest|Codex",
+}
+
+
 @dataclass
 class GroupStats:
     files: int = 0
@@ -54,12 +63,28 @@ class ExportStats:
     group_by: str
     total_session_files: int = 0
     exported_markdown_files: int = 0
-    failed_files: list[str] = field(default_factory=list)
+    failed_files: list[dict[str, str]] = field(default_factory=list)
     total_messages: int = 0
     user_messages: int = 0
     assistant_messages: int = 0
     redactions: int = 0
     groups: dict[str, GroupStats] = field(default_factory=dict)
+
+
+def default_tag_rules_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "references" / "tag-rules.json"
+
+
+def load_tag_patterns(path: Path | None) -> dict[str, re.Pattern[str]]:
+    rules = DEFAULT_TAG_RULES
+    if path and path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                rules = {str(name): str(pattern) for name, pattern in loaded.items()}
+        except (OSError, json.JSONDecodeError):
+            rules = DEFAULT_TAG_RULES
+    return {name: re.compile(pattern, re.IGNORECASE) for name, pattern in rules.items()}
 
 
 def redact_text(text: str) -> tuple[str, int]:
@@ -307,7 +332,7 @@ def write_manifest(dest: Path, stats: ExportStats) -> None:
     (dest / "manifest.md").write_text("\r\n".join(lines), encoding="utf-8")
 
 
-def write_group_summary(dest: Path, group: str) -> Path:
+def write_group_summary(dest: Path, group: str, tag_patterns: dict[str, re.Pattern[str]]) -> Path:
     group_dir = group_dir_from_key(dest, group)
     output_path = group_dir / "summary.tsv" if "/" in group else dest / f"{group}-summary.tsv"
     rows = ["file\tdate\tuserTurns\tassistantTurns\tbytes\ttags"]
@@ -315,13 +340,6 @@ def write_group_summary(dest: Path, group: str) -> Path:
         output_path.write_text("\r\n".join(rows) + "\r\n", encoding="utf-8")
         return output_path
 
-    tag_patterns = {
-        "debug": re.compile(r"bug|error|failed|失败|错误|日志|排查|定位|修复|异常", re.IGNORECASE),
-        "requirements": re.compile(r"需求|方案|设计|架构|边界|规则|文档|说明"),
-        "state": re.compile(r"状态|缓存|刷新|切换|恢复|断连|重连|signal|slot", re.IGNORECASE),
-        "build": re.compile(r"build|cmake|ninja|msvc|编译|构建|验证|测试", re.IGNORECASE),
-        "workflow": re.compile(r"agent|skill|复盘|历史|导出|脱敏|manifest|Codex", re.IGNORECASE),
-    }
     for file in sorted(group_dir.glob("*.md")):
         text = file.read_text(encoding="utf-8", errors="replace")
         content = strip_common_prefix(text)
@@ -368,14 +386,23 @@ def run_export(args: argparse.Namespace) -> int:
     stats.total_session_files = len(session_files)
     allowed_periods = set(args.period or []) or None
     allowed_months = set(args.month or []) or None
+    tag_rules_path = Path(args.tag_rules).expanduser().resolve() if args.tag_rules else default_tag_rules_path()
+    tag_patterns = load_tag_patterns(tag_rules_path)
     for path in session_files:
         try:
             export_one(path, dest, stats, allowed_periods, allowed_months)
-        except Exception:
-            stats.failed_files.append(path.name)
+        except Exception as error:
+            stats.failed_files.append(
+                {
+                    "file": path.name,
+                    "stage": "export",
+                    "errorType": type(error).__name__,
+                    "message": str(error),
+                }
+            )
 
     for group in sorted(stats.groups):
-        write_group_summary(dest, group)
+        write_group_summary(dest, group, tag_patterns)
     write_manifest(dest, stats)
     (dest / "export-stats.json").write_text(json.dumps(stats_to_json(stats), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -404,6 +431,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--group-by", choices=("hierarchy", "year", "month", "week", "day"), default="hierarchy", help="Directory grouping rule. hierarchy creates YYYY/YYYY-MM/YYYY-Www/YYYY-MM-DD. week uses ISO week, e.g. 2026-W03.")
     parser.add_argument("--month", action="append", help="Limit source sessions to YYYY-MM before grouping. Can be repeated.")
     parser.add_argument("--period", action="append", help="Limit exported groups after applying --group-by. hierarchy accepts year, month, week, day, or full relative path.")
+    parser.add_argument("--tag-rules", help="Optional JSON file mapping tag names to regex patterns. Defaults to references/tag-rules.json beside this skill.")
     parser.add_argument("--check-only", action="store_true", help="Only scan destination for sensitive patterns.")
     return parser.parse_args()
 
