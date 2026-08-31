@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
+import tempfile
 
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
@@ -87,6 +89,29 @@ def test_single_weak_keyword_does_not_saturate_long_session():
     assert "multi-end-requirements" not in tags
 
 
+def test_tag_rule_min_hits_boundary():
+    module = load_export_module()
+    with tempfile.TemporaryDirectory() as temp:
+        path = Path(temp) / "rules.json"
+        path.write_text(json.dumps({"topic": {"pattern": "alpha", "minHits": 2}}), encoding="utf-8")
+        patterns = module.load_tag_patterns(path)
+        assert module.match_tags("alpha", patterns) == set()
+        assert module.match_tags("alpha alpha", patterns) == {"topic"}
+
+
+def test_invalid_tag_rule_is_rejected():
+    module = load_export_module()
+    with tempfile.TemporaryDirectory() as temp:
+        path = Path(temp) / "rules.json"
+        path.write_text(json.dumps({"topic": "alpha"}), encoding="utf-8")
+        try:
+            module.load_tag_patterns(path)
+        except ValueError as error:
+            assert "pattern" in str(error)
+        else:
+            raise AssertionError("invalid tag rule was accepted")
+
+
 if __name__ == "__main__":
     for test in (
         test_generic_document_words_do_not_trigger_pdf,
@@ -96,6 +121,8 @@ if __name__ == "__main__":
         test_explicit_requirements_terms_trigger_requirements,
         test_distinct_topics_can_keep_multiple_tags,
         test_single_weak_keyword_does_not_saturate_long_session,
+        test_tag_rule_min_hits_boundary,
+        test_invalid_tag_rule_is_rejected,
     ):
         test()
     print("tag quality tests passed")
