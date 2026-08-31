@@ -41,6 +41,28 @@ def test_pdf_render_terms_trigger_only_document_pdf():
     assert "requirements" not in tags
 
 
+def test_explicit_document_formats_trigger_document_pdf():
+    for text in (
+        "Update the Markdown guide.",
+        "Review README.md before release.",
+        "Create a Word DOCX document.",
+        "Prepare the PPT and PPTX slides.",
+        "Prepare a Microsoft Word document.",
+        "Review the Google Slides deck.",
+    ):
+        assert "document-pdf" in tags_for(text), text
+
+
+def test_document_format_terms_require_explicit_context():
+    for text in (
+        "Document the API behavior.",
+        "The parser reads AGENTS.md before coding.",
+        "Use this word in a sentence.",
+        "The panel slides into view.",
+    ):
+        assert "document-pdf" not in tags_for(text), text
+
+
 def test_explicit_requirements_terms_trigger_requirements():
     tags = tags_for("明确多端数据模型、接口契约、版本冲突和验收标准。")
     assert "requirements" in tags
@@ -56,6 +78,8 @@ if __name__ == "__main__":
     for test in (
         test_generic_document_words_do_not_trigger_pdf,
         test_pdf_render_terms_trigger_only_document_pdf,
+        test_explicit_document_formats_trigger_document_pdf,
+        test_document_format_terms_require_explicit_context,
         test_explicit_requirements_terms_trigger_requirements,
         test_distinct_topics_can_keep_multiple_tags,
     ):
