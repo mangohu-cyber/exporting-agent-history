@@ -39,15 +39,6 @@ COMMON_PREFIX_PATTERNS = [
 ]
 
 
-DEFAULT_TAG_RULES = {
-    "debug": r"bug|error|failed|失败|错误|日志|排查|定位|修复|异常",
-    "requirements": r"需求|方案|设计|架构|边界|规则|文档|说明",
-    "state-cache": r"状态|缓存|刷新|切换|恢复|断连|重连|signal|slot",
-    "build-verify": r"build|cmake|ninja|msvc|编译|构建|验证|测试",
-    "workflow-skill": r"agent|skill|复盘|历史|导出|脱敏|manifest|Codex",
-}
-
-
 @dataclass
 class GroupStats:
     files: int = 0
@@ -79,15 +70,23 @@ def default_tag_rules_path() -> Path:
 
 
 def load_tag_patterns(path: Path | None) -> dict[str, re.Pattern[str]]:
-    rules = DEFAULT_TAG_RULES
-    if path and path.exists():
+    rules_path = path or default_tag_rules_path()
+    try:
+        loaded = json.loads(rules_path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"无法读取标签规则文件: {rules_path} ({error})") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"标签规则文件不是有效 JSON: {rules_path} ({error})") from error
+    if not isinstance(loaded, dict) or not loaded:
+        raise ValueError(f"标签规则文件必须是非空对象: {rules_path}")
+
+    patterns: dict[str, re.Pattern[str]] = {}
+    for name, pattern in loaded.items():
         try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                rules = {str(name): str(pattern) for name, pattern in loaded.items()}
-        except (OSError, json.JSONDecodeError):
-            rules = DEFAULT_TAG_RULES
-    return {name: re.compile(pattern, re.IGNORECASE) for name, pattern in rules.items()}
+            patterns[str(name)] = re.compile(str(pattern), re.IGNORECASE)
+        except re.error as error:
+            raise ValueError(f"标签规则正则无效: {name} ({error})") from error
+    return patterns
 
 
 def redact_text(text: str) -> tuple[str, int]:
@@ -514,7 +513,10 @@ def run_export(args: argparse.Namespace) -> int:
     stats.total_session_files = len(session_files)
     allowed_periods = set(args.period or []) or None
     allowed_months = set(args.month or []) or None
-    tag_patterns = load_tag_patterns(tag_rules_path)
+    try:
+        tag_patterns = load_tag_patterns(tag_rules_path)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     for path in session_files:
         try:
             export_one(path, dest, stats, allowed_periods, allowed_months, args.source_format)

@@ -37,7 +37,7 @@ Do not write machine-specific absolute paths into skill docs or generated guidan
 8. Use the generated group summary for the period being reviewed.
 9. Feed only sanitized Markdown, summaries, manifest, and stats into retrospective work.
 
-Default summary tags come from `references/tag-rules.json`. Use `--tag-rules` only when a specific review needs a temporary tag set.
+Default summary tags come only from `references/tag-rules.json`; the script has no second built-in rule set. Use `--tag-rules` only when a specific review needs a temporary tag set. Invalid or missing rule files must stop the export with a locating error.
 
 ## Script
 
@@ -186,7 +186,7 @@ Markdown sessions must include only user and assistant messages. System, develop
 
 Claude Code exports must include only `user` and `assistant` message text. Skip summaries, `tool_use`, `tool_result`, and non-text content blocks.
 
-`summary.tsv` tags should remain broad review cues, not final conclusions. The default tag set covers debug, requirements, state/cache, map/UI, build/verify, workflow/skill, multi-end requirements, and document/PDF work.
+`summary.tsv` tags should remain review cues, not final conclusions. Rules must prefer topic-specific terms over generic words such as “文档” or “说明”, because generic matches create cross-topic false positives. Always report tag coverage separately; empty tags are a data-quality signal, not evidence that a session has no topic.
 
 ## Data Rules
 
