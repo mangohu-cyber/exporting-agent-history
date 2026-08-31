@@ -65,11 +65,17 @@ class ExportStats:
     groups: dict[str, GroupStats] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class TagRule:
+    pattern: re.Pattern[str]
+    min_hits: int
+
+
 def default_tag_rules_path() -> Path:
     return Path(__file__).resolve().parent.parent / "references" / "tag-rules.json"
 
 
-def load_tag_patterns(path: Path | None) -> dict[str, re.Pattern[str]]:
+def load_tag_patterns(path: Path | None) -> dict[str, TagRule]:
     rules_path = path or default_tag_rules_path()
     try:
         loaded = json.loads(rules_path.read_text(encoding="utf-8"))
@@ -80,13 +86,30 @@ def load_tag_patterns(path: Path | None) -> dict[str, re.Pattern[str]]:
     if not isinstance(loaded, dict) or not loaded:
         raise ValueError(f"标签规则文件必须是非空对象: {rules_path}")
 
-    patterns: dict[str, re.Pattern[str]] = {}
-    for name, pattern in loaded.items():
+    patterns: dict[str, TagRule] = {}
+    for name, rule in loaded.items():
+        if not isinstance(rule, dict):
+            raise ValueError(f"标签规则必须包含 pattern 和 minHits: {name}")
+        pattern = rule.get("pattern")
+        min_hits = rule.get("minHits")
+        if not isinstance(pattern, str) or not pattern:
+            raise ValueError(f"标签规则 pattern 必须是非空字符串: {name}")
+        if not isinstance(min_hits, int) or min_hits < 1:
+            raise ValueError(f"标签规则 minHits 必须是正整数: {name}")
         try:
-            patterns[str(name)] = re.compile(str(pattern), re.IGNORECASE)
+            compiled = re.compile(pattern, re.IGNORECASE)
         except re.error as error:
             raise ValueError(f"标签规则正则无效: {name} ({error})") from error
+        patterns[str(name)] = TagRule(pattern=compiled, min_hits=min_hits)
     return patterns
+
+
+def match_tags(text: str, tag_patterns: dict[str, TagRule]) -> set[str]:
+    return {
+        name
+        for name, rule in tag_patterns.items()
+        if sum(1 for _ in rule.pattern.finditer(text)) >= rule.min_hits
+    }
 
 
 def redact_text(text: str) -> tuple[str, int]:
@@ -373,7 +396,7 @@ def write_manifest(dest: Path, stats: ExportStats) -> None:
     (dest / "manifest.md").write_text("\r\n".join(lines), encoding="utf-8")
 
 
-def write_group_summary(dest: Path, group: str, tag_patterns: dict[str, re.Pattern[str]]) -> Path:
+def write_group_summary(dest: Path, group: str, tag_patterns: dict[str, TagRule]) -> Path:
     group_dir = group_dir_from_key(dest, group)
     output_path = group_dir / "summary.tsv" if "/" in group else dest / f"{group}-summary.tsv"
     rows = ["file\tdate\tuserTurns\tassistantTurns\tbytes\ttags"]
@@ -385,7 +408,8 @@ def write_group_summary(dest: Path, group: str, tag_patterns: dict[str, re.Patte
         text = file.read_text(encoding="utf-8", errors="replace")
         content = strip_common_prefix(text)
         date_match = re.search(r"(\d{4}-\d{2}-\d{2})", file.name)
-        tags = [name for name, pattern in tag_patterns.items() if pattern.search(content)]
+        matched_tags = match_tags(content, tag_patterns)
+        tags = [name for name in tag_patterns if name in matched_tags]
         rows.append(
             "\t".join(
                 [

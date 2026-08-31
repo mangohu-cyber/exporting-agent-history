@@ -1,10 +1,10 @@
 {
-  "debug": "bug|error|failed|失败|错误|日志|排查|定位|修复|异常|崩溃|复现",
-  "requirements": "需求|方案|设计|架构|边界|规则|验收|非目标|接口契约|数据模型|职责|失败路径",
-  "state-cache": "状态|缓存|刷新|切换|恢复|断连|重连|离线|在线|生命周期|signal|slot",
-  "map-ui": "地图|楼层|点位|路径|导入|导出|UI|页面|组件|布局|交互|Tooltip|显示",
-  "build-verify": "build|cmake|ninja|msvc|编译|构建|验证|测试|Release|Debug",
-  "workflow-skill": "agent|skill|复盘|历史|导出|脱敏|manifest|Codex|workflow|工作流",
-  "multi-end-requirements": "云端|本地|机器人端|客户端|多端|设备档案|SN|版本|冲突|同步",
-  "document-pdf": "PDF|图解|截图|渲染|版式|字体|越界|可读性|reportlab|分页|页码|Markdown|(?:create|write|edit|update|review|render|generate|prepare|整理|编写|编辑|更新|审阅|生成|修改|创建|新建|重构)[^\\r\\n]{0,80}\\.md\\b|(?<![A-Za-z0-9_])DOCX?(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])PPTX?(?![A-Za-z0-9_])|Microsoft\\s+Word|Word\\s+(?:document|file)|Google\\s+Slides|slide\\s+deck|slides?\\s+(?:deck|file|presentation)"
+  "debug": {"pattern": "bug|error|failed|失败|错误|日志|排查|定位|修复|异常|崩溃|复现", "minHits": 1},
+  "requirements": {"pattern": "需求|方案|设计|架构|边界|规则|验收|非目标|接口契约|数据模型|职责|失败路径", "minHits": 2},
+  "state-cache": {"pattern": "状态|缓存|刷新|切换|恢复|断连|重连|离线|在线|生命周期|signal|slot", "minHits": 2},
+  "map-ui": {"pattern": "地图|楼层|点位|路径|导入|导出|UI|页面|组件|布局|交互|Tooltip|显示", "minHits": 2},
+  "build-verify": {"pattern": "build|cmake|ninja|msvc|编译|构建|验证|测试|Release|Debug", "minHits": 1},
+  "workflow-skill": {"pattern": "agent|skill|复盘|历史|导出|脱敏|manifest|Codex|workflow|工作流", "minHits": 2},
+  "multi-end-requirements": {"pattern": "云端|本地|机器人端|客户端|多端|设备档案|SN|版本|冲突|同步", "minHits": 2},
+  "document-pdf": {"pattern": "PDF|图解|截图|渲染|版式|字体|越界|可读性|reportlab|分页|页码|Markdown|(?:create|write|edit|update|review|render|generate|prepare|整理|编写|编辑|更新|审阅|生成|修改|创建|新建|重构)[^\\r\\n]{0,80}\\.md\\b|(?<![A-Za-z0-9_])DOCX?(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])PPTX?(?![A-Za-z0-9_])|Microsoft\\s+Word|Word\\s+(?:document|file)|Google\\s+Slides|slide\\s+deck|slides?\\s+(?:deck|file|presentation)", "minHits": 1}
 }

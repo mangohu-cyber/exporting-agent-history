@@ -26,7 +26,7 @@ def load_export_module():
 def tags_for(text: str) -> set[str]:
     module = load_export_module()
     patterns = module.load_tag_patterns(RULES_PATH)
-    return {name for name, pattern in patterns.items() if pattern.search(text)}
+    return module.match_tags(text, patterns)
 
 
 def test_generic_document_words_do_not_trigger_pdf():
@@ -70,8 +70,21 @@ def test_explicit_requirements_terms_trigger_requirements():
 
 
 def test_distinct_topics_can_keep_multiple_tags():
-    tags = tags_for("修复地图 UI 刷新异常，并运行 CMake 测试验证。")
+    tags = tags_for("修复地图 UI 状态刷新异常，并运行 CMake 测试验证。")
     assert {"debug", "map-ui", "state-cache", "build-verify"} <= tags
+
+
+def test_single_weak_keyword_does_not_saturate_long_session():
+    text = " ".join(
+        [
+            "边界、状态、同步、UI、构建、异常各出现一次。",
+        ]
+        + ["普通实现讨论。"] * 100
+    )
+    tags = tags_for(text)
+    assert "requirements" not in tags
+    assert "state-cache" not in tags
+    assert "multi-end-requirements" not in tags
 
 
 if __name__ == "__main__":
@@ -82,6 +95,7 @@ if __name__ == "__main__":
         test_document_format_terms_require_explicit_context,
         test_explicit_requirements_terms_trigger_requirements,
         test_distinct_topics_can_keep_multiple_tags,
+        test_single_weak_keyword_does_not_saturate_long_session,
     ):
         test()
     print("tag quality tests passed")

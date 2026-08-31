@@ -188,6 +188,8 @@ Claude Code exports must include only `user` and `assistant` message text. Skip 
 
 `summary.tsv` tags should remain review cues, not final conclusions. Rules must prefer topic-specific terms over generic words such as “文档” or “说明”, because generic matches create cross-topic false positives. Always report tag coverage separately; empty tags are a data-quality signal, not evidence that a session has no topic.
 
+Each entry in `references/tag-rules.json` uses `{ "pattern": "...", "minHits": N }`. `minHits` counts regex matches in the sanitized session text; use `1` for strong, specific signals and a higher threshold for broad themes. This reduces tag saturation in long sessions without changing the `summary.tsv` schema.
+
 ## Data Rules
 
 - Prefer `--dry-run` before exporting into a non-empty destination.
